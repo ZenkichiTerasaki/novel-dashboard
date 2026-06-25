@@ -1,0 +1,43 @@
+services:
+
+  db:
+    image: postgres:16
+
+    container_name: novel_dashboard_db
+
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: novel_dashboard
+
+    ports:
+      - "5432:5432"
+
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  api:
+    build:
+      context: ./backend
+
+    container_name: novel_dashboard_api
+
+    restart: unless-stopped
+
+    ports:
+      - "3000:3000"
+
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/novel_dashboard
+
+    depends_on:
+      - db
+
+volumes:
+  pgdata:

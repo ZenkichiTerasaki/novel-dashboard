@@ -1,0 +1,37 @@
+# Node.js
+node_modules/
+
+# Build
+dist/
+.next/
+out/
+
+# Environment
+.env
+.env.*
+
+# Node.js
+node_modules/
+
+# NestJS
+backend/node_modules/
+
+# Next.js
+frontend/node_modules/
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Prisma
+prisma/dev.db
+
+# Docker
+postgres_data/
