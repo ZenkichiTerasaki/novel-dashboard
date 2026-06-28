@@ -8,6 +8,8 @@ import {
 } from '@nestjs/common';
 import { ProjectService } from './project.service';
 import { CreateProjectDto } from './dto/create-project.dto';
+import { UseGuards } from '@nestjs/common';
+import { JwtAuthGuard } from '../auth/jwt.guard';
 
 @Controller('projects')
 export class ProjectController {
@@ -15,6 +17,7 @@ export class ProjectController {
     private readonly projectService: ProjectService,
   ) {}
 
+@UseGuards(JwtAuthGuard)
 @Get()
 findAll() {
     return this.projectService.findAll();
