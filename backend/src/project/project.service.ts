@@ -4,17 +4,28 @@ import { CreateProjectDto } from './dto/create-project.dto';
 
 @Injectable()
 export class ProjectService {
-  constructor(
-    private prisma: PrismaService,
-  ) {}
+    constructor(
+        private prisma: PrismaService,
+    ) {}
 
-    async create(dto: CreateProjectDto) {
+    async create(dto: CreateProjectDto, userId : number) {
 
-        console.log(dto);
-        return this.prisma.project.create({
-            data: {
+        return this.prisma.$transaction(async (tx) => {
+            const project = await tx.project.create({
+                data: {
                 name: dto.name,
-            },
+                },
+            });
+
+            await tx.projectMember.create({
+                data: {
+                    projectId: project.id,
+                    userId,
+                    role: 'OWNER',
+                },
+            });
+
+            return project;
         });
     }
 
