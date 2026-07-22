@@ -1,6 +1,6 @@
 import { IsNotEmpty, IsString } from 'class-validator';
 
-export class CreateScenarioDto {
+export class UpdateScenarioDto {
   @IsString()
   @IsNotEmpty()
   name: string;

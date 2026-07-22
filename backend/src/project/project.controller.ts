@@ -5,6 +5,8 @@ import {
   Param,
   ParseIntPipe,
   Post,
+  Patch,
+  Delete,
 } from '@nestjs/common';
 
 import { ProjectService } from './project.service';
@@ -12,7 +14,7 @@ import { CreateProjectDto } from './dto/create-project.dto';
 import { UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
-
+import { UpdateProjectDto } from './dto/update-project.dto';
 
 // `/projects/`
 @Controller('projects')
@@ -25,8 +27,12 @@ export class ProjectController {
     //全プロジェクトを取得
     @UseGuards(JwtAuthGuard)
     @Get()
-    findAll() {
-        return this.projectService.findAll();
+    findAll(
+        @CurrentUser() user: any,
+    ) {
+        return this.projectService.findAll(
+            user.userId,
+        );
     }
 
     //プロジェクトの生成
@@ -46,9 +52,37 @@ export class ProjectController {
     //プロジェクトのID検索
     @Get(':id')
     findOne(
-        @Param('id', ParseIntPipe)
-        id: number,
+        @Param('id', ParseIntPipe) id: number,
+        @CurrentUser() user: any,
     ) {
-        return this.projectService.findOne(id);
+        return this.projectService.findOne(id, user.userId);
+    }
+
+    @UseGuards(JwtAuthGuard)
+    @Patch(':id')
+    update(
+        @Param('id', ParseIntPipe) id: number,
+        @Body() dto: UpdateProjectDto,
+        @CurrentUser() user: any,
+    ) {
+        return this.projectService.update(
+        id,
+        dto,
+        user.userId,
+        );
+    }  
+    
+    
+    @UseGuards(JwtAuthGuard)
+    @Delete(':id')
+    remove(
+        @Param('id', ParseIntPipe) id: number,
+        @CurrentUser() user: any,
+    ) {
+
+        return this.projectService.remove(
+            id,
+            user.userId,
+        );
     }
 }

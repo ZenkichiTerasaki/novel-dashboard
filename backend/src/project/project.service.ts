@@ -1,11 +1,24 @@
-import { Injectable } from '@nestjs/common';
+import { 
+    Injectable,
+    Body,
+    Controller,
+    Get,
+    Post,
+    UseGuards,
+    ForbiddenException
+ } from '@nestjs/common';
+
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateProjectDto } from './dto/create-project.dto';
+import { UpdateProjectDto } from './dto/update-project.dto';
+import {ProjectPermissionService} from './project-permission.service';
+
 
 @Injectable()
 export class ProjectService {
     constructor(
         private prisma: PrismaService,
+        private readonly permissionService: ProjectPermissionService,
     ) {}
 
     async create(dto: CreateProjectDto, userId : number) {
@@ -29,15 +42,60 @@ export class ProjectService {
         });
     }
 
-    async findAll() {
-        return this.prisma.project.findMany();
+    async findAll(userId: number) {
+        return this.prisma.project.findMany({
+            where: {
+                members: {
+                    some: {
+                        userId,
+                    },
+                },
+            },
+        });
     }
 
-    async findOne(id: number) {
+    async findOne(id: number, userId: number) {
+
+        await this.permissionService.requireViewer(userId,id,);
+
         return this.prisma.project.findUnique({
         where: {
             id,
         },
+        });
+    }
+
+
+    async update(
+        id: number,
+        dto: UpdateProjectDto,
+        userId: number,
+    ) {
+
+        await this.permissionService.requireEditor(
+            userId,
+            id,
+        );
+
+        return this.prisma.project.update({
+            where: {
+                id,
+            },
+            data: {
+                 name: dto.name,
+            },
+        });
+    }
+
+
+    async remove(id: number,userId: number,) {
+
+        await this.permissionService.requireOwner(userId,id,);
+
+        return this.prisma.project.delete({
+            where: {
+                id,
+            },
         });
     }
 }
