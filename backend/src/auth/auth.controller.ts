@@ -13,7 +13,7 @@ export class AuthController {
   }
 
   @Get()
-    findAll(@Req() req) {
+  findAll(@Req() req) {
     console.log(req.user);
-    }
+  }
 }
