@@ -184,6 +184,10 @@ export class EventService {
         eventType: dto.eventType,
         param1: dto.param1,
         param2: dto.param2,
+        param3: dto.param3,
+        param4: dto.param4,
+        param5: dto.param5,
+        param6: dto.param6,
       },
     });
   }

@@ -2,23 +2,23 @@
 
 import React, { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { createProject } from "@/lib/api";
+import { createScenario } from "@/lib/api";
 
-export default function ProjectForm() {
+export default function ScenarioForm({ projectId }: { projectId: number }) {
   const [name, setName] = useState("");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const queryClient = useQueryClient();
 
   const mutation = useMutation({
-    mutationFn: (projectName: string) => createProject(projectName),
+    mutationFn: (scenarioName: string) => createScenario(projectId, scenarioName),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["projects"] });
+      queryClient.invalidateQueries({ queryKey: ["scenarios", projectId] });
       setName("");
       setErrorMsg(null);
     },
     onError: (err: any) => {
-      setErrorMsg(err.message || "プロジェクトの作成に失敗しました。");
+      setErrorMsg(err.message || "シナリオの作成に失敗しました。");
     },
   });
 
@@ -31,8 +31,8 @@ export default function ProjectForm() {
   return (
     <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 backdrop-blur-md mb-8">
       <h2 className="text-lg font-bold text-slate-100 mb-4 flex items-center gap-2">
-        <span className="w-2 h-2 rounded-full bg-indigo-500" />
-        新規プロジェクトを作成
+        <span className="w-2 h-2 rounded-full bg-violet-500" />
+        新規シナリオを追加
       </h2>
 
       {errorMsg && (
@@ -46,17 +46,17 @@ export default function ProjectForm() {
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="例: 学園ミステリーノベル 本編"
+          placeholder="例: プロローグ 「運命の出会い」"
           required
-          className="flex-1 px-4 py-3 rounded-xl bg-slate-950/80 border border-slate-800 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-sm transition-all"
+          className="flex-1 px-4 py-3 rounded-xl bg-slate-950/80 border border-slate-800 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 text-sm transition-all"
         />
 
         <button
           type="submit"
           disabled={mutation.isPending || !name.trim()}
-          className="px-6 py-3 rounded-xl font-semibold text-sm text-white bg-indigo-600 hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 shadow-md shadow-indigo-600/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all whitespace-nowrap"
+          className="px-6 py-3 rounded-xl font-semibold text-sm text-white bg-violet-600 hover:bg-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50 shadow-md shadow-violet-600/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all whitespace-nowrap"
         >
-          {mutation.isPending ? "作成中..." : "プロジェクトを作成"}
+          {mutation.isPending ? "作成中..." : "シナリオを作成"}
         </button>
       </form>
     </div>

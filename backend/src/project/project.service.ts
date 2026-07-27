@@ -5,20 +5,23 @@ import {
     Get,
     Post,
     UseGuards,
-    ForbiddenException
+    ForbiddenException,
+    NotFoundException
  } from '@nestjs/common';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
+import { InviteMemberDto } from './dto/invite-member.dto';
 import {ProjectPermissionService} from './project-permission.service';
-
+import { UserService } from '../user/user.service';
 
 @Injectable()
 export class ProjectService {
     constructor(
         private prisma: PrismaService,
         private readonly permissionService: ProjectPermissionService,
+        private readonly userService: UserService,
     ) {}
 
     async create(dto: CreateProjectDto, userId : number) {
@@ -97,5 +100,35 @@ export class ProjectService {
                 id,
             },
         });
+    }
+
+    async inviteMember(
+    projectId: number,
+    dto: InviteMemberDto,
+    userId: number,
+    ) {
+    await this.permissionService.requireOwner(
+        userId,
+        projectId,
+    );
+
+    const user =
+        await this.userService.findByEmail(
+        dto.email,
+        );
+
+    if (!user) {
+        throw new NotFoundException(
+        'ユーザが見つかりません。',
+        );
+    }
+
+    return this.prisma.projectMember.create({
+        data: {
+        projectId,
+        userId: user.id,
+        role: dto.role,
+        },
+    });
     }
 }

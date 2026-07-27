@@ -15,6 +15,7 @@ import { UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { UpdateProjectDto } from './dto/update-project.dto';
+import { InviteMemberDto } from './dto/invite-member.dto';
 
 // `/projects/`
 @Controller('projects')
@@ -50,11 +51,14 @@ export class ProjectController {
     }
 
     //プロジェクトのID検索
+    @UseGuards(JwtAuthGuard)
     @Get(':id')
     findOne(
         @Param('id', ParseIntPipe) id: number,
         @CurrentUser() user: any,
     ) {
+
+        console.log('request user:', user);
         return this.projectService.findOne(id, user.userId);
     }
 
@@ -84,5 +88,24 @@ export class ProjectController {
             id,
             user.userId,
         );
+    }
+
+    @UseGuards(JwtAuthGuard)
+    @Post(':projectId/members')
+    inviteMember(
+    @Param('projectId', ParseIntPipe)
+    projectId: number,
+
+    @Body()
+    dto: InviteMemberDto,
+
+    @CurrentUser()
+    user: any,
+    ) {
+    return this.projectService.inviteMember(
+        projectId,
+        dto,
+        user.userId,
+    );
     }
 }
