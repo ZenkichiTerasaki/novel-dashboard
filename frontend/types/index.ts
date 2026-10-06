@@ -50,6 +50,16 @@ export interface Event {
   updatedAt?: string;
 }
 
+export type DraftEvent = {
+  eventType: string;
+  param1?: string;
+  param2?: string;
+  param3?: string;
+  param4?: string;
+  param5?: string;
+  param6?: string;
+};
+
 export interface AuthResponse {
   access_token: string;
 }

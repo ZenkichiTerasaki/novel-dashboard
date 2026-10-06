@@ -4,6 +4,8 @@ import React, { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createEvent } from "@/lib/api";
 
+import { DraftEvent } from "@/types";
+
 const EVENT_TYPES = [
   { value: "text", label: "💬 会話・セリフ", color: "indigo" },
   { value: "bg_change", label: "🖼️ 背景変更", color: "violet" },
@@ -13,7 +15,13 @@ const EVENT_TYPES = [
   { value: "custom", label: "⚙️ カスタムコマンド", color: "slate" },
 ];
 
-export default function EventForm({ scenarioId }: { scenarioId: number }) {
+interface EventFormProps {
+  scenarioId: number;
+  onDraftChange?: (draft: DraftEvent) => void;
+  onDraftSubmit?: () => void;
+}
+
+export default function EventForm({ scenarioId, onDraftChange, onDraftSubmit }: EventFormProps) {
   const queryClient = useQueryClient();
   const [eventType, setEventType] = useState("text");
 
@@ -26,8 +34,21 @@ export default function EventForm({ scenarioId }: { scenarioId: number }) {
 
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  // 下書き内容の変更を親（プレビュー画面）に通知
+  React.useEffect(() => {
+    onDraftChange?.({
+      eventType,
+      param1: param1.trim() || undefined,
+      param2: param2.trim() || undefined,
+      param3: param3.trim() || undefined,
+      param4: param4.trim() || undefined,
+      param5: param5.trim() || undefined,
+      param6: param6.trim() || undefined,
+    });
+  }, [eventType, param1, param2, param3, param4, param5, param6, onDraftChange]);
+
   const mutation = useMutation({
-    mutationFn: (data: any) => createEvent(scenarioId, data),
+    mutationFn: (data: DraftEvent) => createEvent(scenarioId, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["events", scenarioId] });
       // パラメータをリセット
@@ -38,8 +59,9 @@ export default function EventForm({ scenarioId }: { scenarioId: number }) {
       setParam5("");
       setParam6("");
       setErrorMsg(null);
+      onDraftSubmit?.();
     },
-    onError: (err: any) => {
+    onError: (err: Error) => {
       setErrorMsg(err.message || "イベントの追加に失敗しました。");
     },
   });
@@ -59,10 +81,16 @@ export default function EventForm({ scenarioId }: { scenarioId: number }) {
 
   return (
     <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 backdrop-blur-md mb-8">
-      <h3 className="text-lg font-bold text-slate-100 mb-4 flex items-center gap-2">
-        <span className="w-2 h-2 rounded-full bg-indigo-500" />
-        新しい演出イベントを追加
-      </h3>
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-lg font-bold text-slate-100 flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-indigo-500" />
+          新しい演出イベントを追加
+        </h3>
+        <span className="text-[11px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded-full flex items-center gap-1 font-medium">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+          プレビュー連動中
+        </span>
+      </div>
 
       {errorMsg && (
         <div className="mb-4 p-3 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-300 text-sm">

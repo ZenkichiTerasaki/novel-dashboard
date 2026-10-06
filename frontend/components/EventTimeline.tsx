@@ -15,22 +15,30 @@ const TYPE_CONFIG: Record<string, { label: string; bg: string; border: string; t
   custom: { label: "カスタム", bg: "bg-slate-500/10", border: "border-slate-500/30", text: "text-slate-400", icon: "⚙️" },
 };
 
+interface EventTimelineProps {
+  scenarioId: number;
+  events: Event[];
+  previewIndex?: number;
+  onSelectPreviewIndex?: (index: number) => void;
+}
+
 export default function EventTimeline({
   scenarioId,
   events: initialEvents,
-}: {
-  scenarioId: number;
-  events: Event[];
-}) {
+  previewIndex,
+  onSelectPreviewIndex,
+}: EventTimelineProps) {
   const queryClient = useQueryClient();
   const [items, setItems] = useState<Event[]>(initialEvents);
+  const [prevEvents, setPrevEvents] = useState<Event[]>(initialEvents);
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
-  useEffect(() => {
+  if (prevEvents !== initialEvents) {
+    setPrevEvents(initialEvents);
     setItems(initialEvents);
-  }, [initialEvents]);
+  }
 
   // 並べ替え mutation
   const reorderMutation = useMutation({
@@ -38,7 +46,7 @@ export default function EventTimeline({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["events", scenarioId] });
     },
-    onError: (err: any) => {
+    onError: (err: Error) => {
       alert("順序の保存に失敗しました: " + err.message);
       setItems(initialEvents); // ロールバック
     },
@@ -113,6 +121,7 @@ export default function EventTimeline({
 
       {items.map((event, index) => {
         const config = TYPE_CONFIG[event.eventType] || TYPE_CONFIG.custom;
+        const isCurrentPreview = previewIndex === index;
 
         return (
           <div
@@ -121,16 +130,24 @@ export default function EventTimeline({
             onDragStart={(e) => handleDragStart(e, index)}
             onDragOver={(e) => handleDragOver(e, index)}
             onDrop={(e) => handleDrop(e, index)}
-            className={`group bg-slate-900/70 hover:bg-slate-900 border border-slate-800/80 hover:border-indigo-500/40 rounded-2xl p-4 backdrop-blur-md transition-all duration-150 flex items-center justify-between gap-4 cursor-grab active:cursor-grabbing ${
-              draggedIndex === index ? "opacity-40 border-dashed border-indigo-500" : ""
-            }`}
+            className={`group bg-slate-900/70 hover:bg-slate-900 border rounded-2xl p-4 backdrop-blur-md transition-all duration-150 flex items-center justify-between gap-4 cursor-grab active:cursor-grabbing ${
+              isCurrentPreview
+                ? "border-indigo-500 bg-indigo-950/20 shadow-md shadow-indigo-500/10 ring-1 ring-indigo-500/40"
+                : "border-slate-800/80 hover:border-indigo-500/40"
+            } ${draggedIndex === index ? "opacity-40 border-dashed border-indigo-500" : ""}`}
           >
             {/* ドラッグハンドル & インデックス */}
             <div className="flex items-center gap-3">
               <span className="text-slate-600 group-hover:text-slate-400 text-sm select-none">
                 ⋮⋮
               </span>
-              <span className="w-6 h-6 rounded-lg bg-slate-950 border border-slate-800 text-slate-400 font-mono text-xs flex items-center justify-center font-semibold">
+              <span
+                className={`w-6 h-6 rounded-lg border font-mono text-xs flex items-center justify-center font-semibold transition-colors ${
+                  isCurrentPreview
+                    ? "bg-indigo-600 border-indigo-400 text-white"
+                    : "bg-slate-950 border-slate-800 text-slate-400"
+                }`}
+              >
                 {index + 1}
               </span>
               <div
@@ -142,7 +159,11 @@ export default function EventTimeline({
             </div>
 
             {/* イベントコンテンツ概要 */}
-            <div className="flex-1 min-w-0 px-2">
+            <div
+              className="flex-1 min-w-0 px-2 cursor-pointer"
+              onClick={() => onSelectPreviewIndex?.(index)}
+              title="クリックしてプレビュー再生"
+            >
               {event.eventType === "text" && (
                 <div className="flex items-baseline gap-2 truncate">
                   {event.param1 && (
@@ -190,8 +211,24 @@ export default function EventTimeline({
               )}
             </div>
 
-            {/* 並べ替えボタン & 操作ボタン */}
-            <div className="flex items-center gap-1 shrink-0">
+            {/* プレビューボタン & 並べ替え & 操作ボタン */}
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                type="button"
+                onClick={() => onSelectPreviewIndex?.(index)}
+                className={`px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-1 transition-all ${
+                  isCurrentPreview
+                    ? "bg-indigo-600 text-white shadow-sm shadow-indigo-600/30"
+                    : "bg-slate-950/60 hover:bg-indigo-600/20 text-slate-400 hover:text-indigo-300 border border-slate-800 hover:border-indigo-500/40"
+                }`}
+                title="このイベントからプレビュー"
+              >
+                <span>▶</span>
+                <span className="hidden sm:inline">{isCurrentPreview ? "プレビュー中" : "プレビュー"}</span>
+              </button>
+
+              <div className="w-px h-4 bg-slate-800 mx-0.5" />
+
               <button
                 type="button"
                 onClick={() => moveItem(index, index - 1)}
@@ -211,7 +248,7 @@ export default function EventTimeline({
                 ▼
               </button>
 
-              <div className="w-px h-4 bg-slate-800 mx-1" />
+              <div className="w-px h-4 bg-slate-800 mx-0.5" />
 
               <button
                 type="button"

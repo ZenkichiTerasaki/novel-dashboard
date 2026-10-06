@@ -26,12 +26,12 @@ export default function EventEditModal({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const mutation = useMutation({
-    mutationFn: (data: any) => updateEvent(event.id, data),
+    mutationFn: (data: Partial<Event>) => updateEvent(event.id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["events", scenarioId] });
       onClose();
     },
-    onError: (err: any) => {
+    onError: (err: Error) => {
       setErrorMsg(err.message || "更新に失敗しました。");
     },
   });
