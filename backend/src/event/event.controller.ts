@@ -13,8 +13,8 @@ import {
 import { EventService } from './event.service';
 import { CreateEventDto } from './dto/create-event.dto';
 import { ReorderEventsDto } from './dto/reorder-events.dto';
-import { JwtAuthGuard } from '../auth/jwt.guard';
-import { CurrentUser } from 'src/auth/current-user.decorator';
+import { SessionAuthGuard } from '../auth/session-auth.guard';
+import { CurrentUser } from '../auth/current-user.decorator';
 import { UpdateEventDto } from './dto/update-event.dto';
 
 @Controller()
@@ -25,7 +25,7 @@ export class EventController {
     private readonly eventService: EventService,
   ) {}
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(SessionAuthGuard)
   @Post('scenarios/:scenarioId/events')
   create(
       /*引数*/ 
@@ -45,7 +45,7 @@ export class EventController {
     );
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(SessionAuthGuard)
   @Get('scenarios/:scenarioId/events')
   findAll(
     /*引数*/ 
@@ -59,21 +59,24 @@ export class EventController {
     );
   }
 
+  @UseGuards(SessionAuthGuard)
   @Patch('scenarios/:scenarioId/events/order')
   reorder(
     /*引数*/
     @Param('scenarioId', ParseIntPipe) scenarioId: number,
     @Body() dto: ReorderEventsDto,
+    @CurrentUser() user: any,
     /*---*/ 
   ) {
     return this.eventService.reorder(
       scenarioId,
       dto.eventIds,
+      user.userId,
     );
   }
 
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(SessionAuthGuard)
   @Patch('events/:id')
   update(
     /*引数*/
@@ -89,7 +92,7 @@ export class EventController {
     );
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(SessionAuthGuard)
   @Delete('events/:id')
   remove(
     /*引数*/

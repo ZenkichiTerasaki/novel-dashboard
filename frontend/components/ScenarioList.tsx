@@ -4,10 +4,20 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getScenarios, updateScenario, deleteScenario } from "@/lib/api";
-import { Scenario } from "@/types";
+import { ProjectRole, Scenario } from "@/types";
+import { canEditProject, isProjectOwner } from "./RoleBadge";
 
-export default function ScenarioList({ projectId }: { projectId: number }) {
+export default function ScenarioList({
+  projectId,
+  myRole,
+}: {
+  projectId: number;
+  myRole?: ProjectRole;
+}) {
   const queryClient = useQueryClient();
+  const canEdit = canEditProject(myRole);
+  const isOwner = isProjectOwner(myRole);
+
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editName, setEditName] = useState("");
   const [deletingId, setDeletingId] = useState<number | null>(null);
@@ -23,12 +33,20 @@ export default function ScenarioList({ projectId }: { projectId: number }) {
       queryClient.invalidateQueries({ queryKey: ["scenarios", projectId] });
       setEditingId(null);
     },
+    onError: (err: Error) => {
+      alert(err.message || "シナリオ名の変更に失敗しました");
+    },
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: number) => deleteScenario(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["scenarios", projectId] });
+      queryClient.invalidateQueries({ queryKey: ["project", projectId] });
+      setDeletingId(null);
+    },
+    onError: (err: Error) => {
+      alert(err.message || "シナリオの削除に失敗しました");
       setDeletingId(null);
     },
   });
@@ -81,7 +99,11 @@ export default function ScenarioList({ projectId }: { projectId: number }) {
           📜
         </div>
         <h3 className="text-base font-semibold text-slate-200">シナリオがありません</h3>
-        <p className="text-slate-400 text-xs mt-1">「新規シナリオを追加」から新しい章や場面を作成してください。</p>
+        <p className="text-slate-400 text-xs mt-1">
+          {canEdit
+            ? "「新規シナリオを追加」から新しい章や場面を作成してください。"
+            : "まだ公開されているシナリオがありません。"}
+        </p>
       </div>
     );
   }
@@ -93,7 +115,7 @@ export default function ScenarioList({ projectId }: { projectId: number }) {
           key={scenario.id}
           className="group relative bg-slate-900/60 hover:bg-slate-900 border border-slate-800/80 hover:border-violet-500/50 rounded-2xl p-5 backdrop-blur-md transition-all duration-200 flex items-center justify-between gap-4"
         >
-          {editingId === scenario.id ? (
+          {editingId === scenario.id && canEdit ? (
             <form onSubmit={(e) => handleUpdate(e, scenario.id)} className="flex-1 flex items-center gap-3">
               <input
                 type="text"
@@ -135,26 +157,30 @@ export default function ScenarioList({ projectId }: { projectId: number }) {
               </div>
 
               <div className="flex items-center gap-2 shrink-0">
-                <button
-                  onClick={(e) => startEdit(e, scenario)}
-                  className="p-2 text-xs text-slate-400 hover:text-violet-400 hover:bg-violet-500/10 rounded-lg transition-colors"
-                  title="名前変更"
-                >
-                  ✏️
-                </button>
-                <button
-                  onClick={(e) => handleDelete(e, scenario.id, scenario.name)}
-                  disabled={deletingId === scenario.id}
-                  className="p-2 text-xs text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
-                  title="削除"
-                >
-                  {deletingId === scenario.id ? "..." : "🗑️"}
-                </button>
+                {canEdit && (
+                  <button
+                    onClick={(e) => startEdit(e, scenario)}
+                    className="p-2 text-xs text-slate-400 hover:text-violet-400 hover:bg-violet-500/10 rounded-lg transition-colors"
+                    title="名前変更"
+                  >
+                    ✏️
+                  </button>
+                )}
+                {isOwner && (
+                  <button
+                    onClick={(e) => handleDelete(e, scenario.id, scenario.name)}
+                    disabled={deletingId === scenario.id}
+                    className="p-2 text-xs text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
+                    title="削除 (OWNER)"
+                  >
+                    {deletingId === scenario.id ? "..." : "🗑️"}
+                  </button>
+                )}
                 <Link
                   href={`/projects/${projectId}/scenarios/${scenario.id}`}
                   className="ml-2 px-4 py-2 rounded-xl text-xs font-semibold text-white bg-slate-800 hover:bg-violet-600 transition-all flex items-center gap-1"
                 >
-                  エディタを開く &rarr;
+                  {canEdit ? "エディタを開く" : "プレビューを開く"} &rarr;
                 </Link>
               </div>
             </>

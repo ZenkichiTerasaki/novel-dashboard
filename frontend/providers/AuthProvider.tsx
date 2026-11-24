@@ -1,73 +1,68 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState } from "react";
-import { getToken, logoutUser, parseJwtPayload, loginUser as apiLoginUser, registerUser as apiRegisterUser } from "@/lib/api";
-
-interface AuthUser {
-  userId: number;
-  email?: string;
-}
+import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import {
+  getMe,
+  loginUser as apiLoginUser,
+  logoutUser as apiLogoutUser,
+  registerUser as apiRegisterUser,
+} from "@/lib/api";
+import { User } from "@/types";
 
 interface AuthContextType {
-  token: string | null;
-  user: AuthUser | null;
+  user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   login: typeof apiLoginUser;
   register: typeof apiRegisterUser;
-  logout: () => void;
+  logout: () => Promise<void>;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
-  token: null,
   user: null,
   isAuthenticated: false,
   isLoading: true,
-  login: async () => ({ access_token: "" }),
+  login: async () => ({ user: { id: 0, name: "", email: "" } }),
   register: async () => ({ id: 0, name: "", email: "" }),
-  logout: () => {},
+  logout: async () => {},
+  refreshUser: async () => {},
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [token, setTokenState] = useState<string | null>(null);
-  const [user, setUser] = useState<AuthUser | null>(null);
+  const queryClient = useQueryClient();
+  const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    const savedToken = getToken();
-    if (savedToken) {
-      const payload = parseJwtPayload(savedToken);
-      if (payload && payload.userId) {
-        // トークン期限切れの確認
-        if (payload.exp && payload.exp * 1000 < Date.now()) {
-          logoutUser();
-          setTokenState(null);
-          setUser(null);
-        } else {
-          setTokenState(savedToken);
-          setUser({ userId: payload.userId, email: payload.email });
-        }
-      } else {
-        removeTokenFromState();
-      }
-    }
-    setIsLoading(false);
+  const refreshUser = useCallback(async () => {
+    const me = await getMe();
+    setUser(me);
   }, []);
 
-  const removeTokenFromState = () => {
-    setTokenState(null);
-    setUser(null);
-  };
+  useEffect(() => {
+    let mounted = true;
+    getMe()
+      .then((me) => {
+        if (mounted) {
+          setUser(me);
+        }
+      })
+      .finally(() => {
+        if (mounted) {
+          setIsLoading(false);
+        }
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const login: typeof apiLoginUser = async (data) => {
     const res = await apiLoginUser(data);
-    if (res.access_token) {
-      setTokenState(res.access_token);
-      const payload = parseJwtPayload(res.access_token);
-      if (payload && payload.userId) {
-        setUser({ userId: payload.userId, email: payload.email });
-      }
-    }
+    queryClient.clear();
+    setUser(res.user);
     return res;
   };
 
@@ -75,21 +70,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return apiRegisterUser(data);
   };
 
-  const logout = () => {
-    removeTokenFromState();
-    logoutUser();
+  const logout = async () => {
+    await apiLogoutUser();
+    setUser(null);
+    queryClient.clear();
+    if (typeof window !== "undefined") {
+      window.location.href = "/login";
+    }
   };
 
   return (
     <AuthContext.Provider
       value={{
-        token,
         user,
-        isAuthenticated: !!token,
+        isAuthenticated: !!user,
         isLoading,
         login,
         register,
         logout,
+        refreshUser,
       }}
     >
       {children}

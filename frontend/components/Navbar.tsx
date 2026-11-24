@@ -20,10 +20,13 @@ export default function Navbar() {
         </Link>
 
         {isAuthenticated && (
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3 sm:gap-4">
             <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-950/60 border border-slate-800 text-xs text-slate-300">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span>{user?.email || `User #${user?.userId}`}</span>
+              <span className="font-semibold text-slate-100">{user?.name}</span>
+              {user?.email && (
+                <span className="text-slate-400">({user.email})</span>
+              )}
             </div>
 
             <button

@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { deleteEvent, reorderEvents } from "@/lib/api";
-import { Event } from "@/types";
+import { Event, ProjectPresets } from "@/types";
 import EventEditModal from "./EventEditModal";
 
 const TYPE_CONFIG: Record<string, { label: string; bg: string; border: string; text: string; icon: string }> = {
@@ -16,17 +16,23 @@ const TYPE_CONFIG: Record<string, { label: string; bg: string; border: string; t
 };
 
 interface EventTimelineProps {
+  projectId?: number;
   scenarioId: number;
   events: Event[];
+  presets?: ProjectPresets;
   previewIndex?: number;
   onSelectPreviewIndex?: (index: number) => void;
+  readOnly?: boolean;
 }
 
 export default function EventTimeline({
+  projectId,
   scenarioId,
   events: initialEvents,
+  presets,
   previewIndex,
   onSelectPreviewIndex,
+  readOnly = false,
 }: EventTimelineProps) {
   const queryClient = useQueryClient();
   const [items, setItems] = useState<Event[]>(initialEvents);
@@ -105,7 +111,9 @@ export default function EventTimeline({
         </div>
         <h3 className="text-base font-semibold text-slate-200">イベントが登録されていません</h3>
         <p className="text-slate-400 text-xs mt-1">
-          上のフォームからセリフや背景変更などのイベントを追加してください。
+          {readOnly
+            ? "このシナリオにはまだイベントが登録されていません。"
+            : "上のフォームからセリフや背景変更などのイベントを追加してください。"}
         </p>
       </div>
     );
@@ -126,11 +134,13 @@ export default function EventTimeline({
         return (
           <div
             key={event.id}
-            draggable
-            onDragStart={(e) => handleDragStart(e, index)}
-            onDragOver={(e) => handleDragOver(e, index)}
-            onDrop={(e) => handleDrop(e, index)}
-            className={`group bg-slate-900/70 hover:bg-slate-900 border rounded-2xl p-4 backdrop-blur-md transition-all duration-150 flex items-center justify-between gap-4 cursor-grab active:cursor-grabbing ${
+            draggable={!readOnly}
+            onDragStart={readOnly ? undefined : (e) => handleDragStart(e, index)}
+            onDragOver={readOnly ? undefined : (e) => handleDragOver(e, index)}
+            onDrop={readOnly ? undefined : (e) => handleDrop(e, index)}
+            className={`group bg-slate-900/70 hover:bg-slate-900 border rounded-2xl p-4 backdrop-blur-md transition-all duration-150 flex items-center justify-between gap-4 ${
+              readOnly ? "cursor-pointer" : "cursor-grab active:cursor-grabbing"
+            } ${
               isCurrentPreview
                 ? "border-indigo-500 bg-indigo-950/20 shadow-md shadow-indigo-500/10 ring-1 ring-indigo-500/40"
                 : "border-slate-800/80 hover:border-indigo-500/40"
@@ -138,9 +148,11 @@ export default function EventTimeline({
           >
             {/* ドラッグハンドル & インデックス */}
             <div className="flex items-center gap-3">
-              <span className="text-slate-600 group-hover:text-slate-400 text-sm select-none">
-                ⋮⋮
-              </span>
+              {!readOnly && (
+                <span className="text-slate-600 group-hover:text-slate-400 text-sm select-none">
+                  ⋮⋮
+                </span>
+              )}
               <span
                 className={`w-6 h-6 rounded-lg border font-mono text-xs flex items-center justify-center font-semibold transition-colors ${
                   isCurrentPreview
@@ -165,48 +177,72 @@ export default function EventTimeline({
               title="クリックしてプレビュー再生"
             >
               {event.eventType === "text" && (
-                <div className="flex items-baseline gap-2 truncate">
-                  {event.param1 && (
-                    <span className="font-bold text-slate-200 text-sm shrink-0">
-                      【{event.param1}】
+                <div className="space-y-1">
+                  <div className="flex items-start gap-2">
+                    {event.data?.speaker && (
+                      <span className="font-bold text-slate-200 text-sm shrink-0">
+                        【{event.data.speaker}】
+                      </span>
+                    )}
+                    <span className="text-slate-300 text-sm whitespace-pre-wrap line-clamp-3 break-words">
+                      {event.data?.text || "(テキストなし)"}
                     </span>
+                  </div>
+                  {event.data?.positions && Object.keys(event.data.positions).length > 0 && (
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {Object.entries(event.data.positions).map(([slot, img]) =>
+                        img ? (
+                          <span
+                            key={slot}
+                            className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${
+                              img === "none"
+                                ? "bg-rose-500/10 border-rose-500/30 text-rose-300"
+                                : "bg-emerald-500/10 border-emerald-500/30 text-emerald-300"
+                            }`}
+                          >
+                            {slot}: {img === "none" ? "退場(none)" : img}
+                          </span>
+                        ) : null
+                      )}
+                    </div>
                   )}
-                  <span className="text-slate-300 text-sm truncate">
-                    {event.param2 || "(テキストなし)"}
-                  </span>
                 </div>
               )}
 
               {event.eventType === "bg_change" && (
                 <div className="text-sm text-slate-300 flex items-center gap-2 truncate">
-                  <span className="font-semibold text-violet-300">{event.param1}</span>
-                  {event.param2 && <span className="text-xs text-slate-500">({event.param2})</span>}
+                  <span className="font-semibold text-violet-300">{event.data?.image}</span>
+                  {event.data?.effect && (
+                    <span className="text-xs text-slate-500">({event.data.effect})</span>
+                  )}
                 </div>
               )}
 
               {event.eventType === "bgm_play" && (
                 <div className="text-sm text-amber-300 font-semibold truncate">
-                  🎵 {event.param1}
+                  🎵 {event.data?.bgmId}
                 </div>
               )}
 
               {event.eventType === "sound_effect" && (
                 <div className="text-sm text-emerald-300 font-semibold truncate">
-                  🔊 {event.param1}
+                  🔊 {event.data?.seId}
                 </div>
               )}
 
               {event.eventType === "selection" && (
                 <div className="flex items-center gap-2 text-xs text-rose-300 font-medium truncate">
-                  <span>[1] {event.param1}</span>
-                  {event.param2 && <span>| [2] {event.param2}</span>}
-                  {event.param3 && <span>| [3] {event.param3}</span>}
+                  {(event.data?.choices || []).map((choice, idx) => (
+                    <span key={idx}>
+                      {idx > 0 ? "| " : ""}[{idx + 1}] {choice}
+                    </span>
+                  ))}
                 </div>
               )}
 
               {event.eventType === "custom" && (
                 <div className="text-xs text-slate-400 truncate">
-                  {[event.param1, event.param2, event.param3].filter(Boolean).join(" , ")}
+                  {(event.data?.params || []).filter(Boolean).join(" , ")}
                 </div>
               )}
             </div>
@@ -227,46 +263,50 @@ export default function EventTimeline({
                 <span className="hidden sm:inline">{isCurrentPreview ? "プレビュー中" : "プレビュー"}</span>
               </button>
 
-              <div className="w-px h-4 bg-slate-800 mx-0.5" />
+              {!readOnly && (
+                <>
+                  <div className="w-px h-4 bg-slate-800 mx-0.5" />
 
-              <button
-                type="button"
-                onClick={() => moveItem(index, index - 1)}
-                disabled={index === 0}
-                className="p-1.5 rounded-lg text-slate-500 hover:text-slate-200 hover:bg-slate-800 disabled:opacity-20 transition-colors"
-                title="上へ移動"
-              >
-                ▲
-              </button>
-              <button
-                type="button"
-                onClick={() => moveItem(index, index + 1)}
-                disabled={index === items.length - 1}
-                className="p-1.5 rounded-lg text-slate-500 hover:text-slate-200 hover:bg-slate-800 disabled:opacity-20 transition-colors"
-                title="下へ移動"
-              >
-                ▼
-              </button>
+                  <button
+                    type="button"
+                    onClick={() => moveItem(index, index - 1)}
+                    disabled={index === 0}
+                    className="p-1.5 rounded-lg text-slate-500 hover:text-slate-200 hover:bg-slate-800 disabled:opacity-20 transition-colors"
+                    title="上へ移動"
+                  >
+                    ▲
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => moveItem(index, index + 1)}
+                    disabled={index === items.length - 1}
+                    className="p-1.5 rounded-lg text-slate-500 hover:text-slate-200 hover:bg-slate-800 disabled:opacity-20 transition-colors"
+                    title="下へ移動"
+                  >
+                    ▼
+                  </button>
 
-              <div className="w-px h-4 bg-slate-800 mx-0.5" />
+                  <div className="w-px h-4 bg-slate-800 mx-0.5" />
 
-              <button
-                type="button"
-                onClick={() => setEditingEvent(event)}
-                className="p-1.5 text-xs text-slate-400 hover:text-indigo-400 hover:bg-indigo-500/10 rounded-lg transition-colors"
-                title="編集"
-              >
-                ✏️
-              </button>
-              <button
-                type="button"
-                onClick={() => handleDelete(event.id)}
-                disabled={deletingId === event.id}
-                className="p-1.5 text-xs text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
-                title="削除"
-              >
-                {deletingId === event.id ? "..." : "🗑️"}
-              </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditingEvent(event)}
+                    className="p-1.5 text-xs text-slate-400 hover:text-indigo-400 hover:bg-indigo-500/10 rounded-lg transition-colors"
+                    title="編集"
+                  >
+                    ✏️
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(event.id)}
+                    disabled={deletingId === event.id}
+                    className="p-1.5 text-xs text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
+                    title="削除"
+                  >
+                    {deletingId === event.id ? "..." : "🗑️"}
+                  </button>
+                </>
+              )}
             </div>
           </div>
         );
@@ -275,8 +315,10 @@ export default function EventTimeline({
       {/* 編集モーダル */}
       {editingEvent && (
         <EventEditModal
+          projectId={projectId}
           event={editingEvent}
           scenarioId={scenarioId}
+          presets={presets}
           onClose={() => setEditingEvent(null)}
         />
       )}

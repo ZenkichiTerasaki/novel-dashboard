@@ -6,10 +6,14 @@ import { useRouter } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { updateProject, deleteProject } from "@/lib/api";
 import { Project } from "@/types";
+import RoleBadge, { canEditProject, isProjectOwner } from "./RoleBadge";
 
 export default function ProjectHeader({ project }: { project: Project }) {
   const router = useRouter();
   const queryClient = useQueryClient();
+
+  const canEdit = canEditProject(project.myRole);
+  const isOwner = isProjectOwner(project.myRole);
 
   const [isEditing, setIsEditing] = useState(false);
   const [name, setName] = useState(project.name);
@@ -33,6 +37,9 @@ export default function ProjectHeader({ project }: { project: Project }) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["projects"] });
       router.push("/");
+    },
+    onError: (err: any) => {
+      setErrorMsg(err.message || "削除に失敗しました");
     },
   });
 
@@ -66,7 +73,7 @@ export default function ProjectHeader({ project }: { project: Project }) {
       )}
 
       <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-6 backdrop-blur-md flex flex-col md:flex-row md:items-center justify-between gap-4">
-        {isEditing ? (
+        {isEditing && canEdit ? (
           <form onSubmit={handleUpdate} className="flex-1 flex items-center gap-3">
             <input
               type="text"
@@ -99,33 +106,55 @@ export default function ProjectHeader({ project }: { project: Project }) {
               📖
             </div>
             <div>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2.5 flex-wrap">
                 <h1 className="text-2xl font-extrabold text-slate-100 tracking-tight">
                   {project.name}
                 </h1>
-                <button
-                  onClick={() => setIsEditing(true)}
-                  className="p-1 text-xs text-slate-400 hover:text-indigo-400 transition-colors"
-                  title="名前を変更"
-                >
-                  ✏️
-                </button>
+                <RoleBadge role={project.myRole} />
+                {canEdit && (
+                  <button
+                    onClick={() => setIsEditing(true)}
+                    className="p-1 text-xs text-slate-400 hover:text-indigo-400 transition-colors"
+                    title="プロジェクト名を変更"
+                  >
+                    ✏️
+                  </button>
+                )}
               </div>
               <p className="text-xs text-slate-400 mt-1">
-                作成日: {project.createdAt ? new Date(project.createdAt).toLocaleDateString('ja-JP') : "不明"}
+                作成日:{" "}
+                {project.createdAt
+                  ? new Date(project.createdAt).toLocaleDateString("ja-JP")
+                  : "不明"}
+                {project._count && (
+                  <span className="ml-3">
+                    メンバー: {project._count.members ?? 1}名 / シナリオ:{" "}
+                    {project._count.scenarios ?? 0}件
+                  </span>
+                )}
               </p>
             </div>
           </div>
         )}
 
-        <div className="flex items-center gap-3">
-          <button
-            onClick={handleDelete}
-            disabled={deleteMutation.isPending}
-            className="px-4 py-2 rounded-xl text-xs font-semibold text-rose-400 hover:text-rose-300 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 transition-all"
+        <div className="flex items-center gap-3 flex-wrap">
+          <Link
+            href={`/projects/${project.id}/assets`}
+            className="px-4 py-2 rounded-xl text-xs font-semibold text-indigo-300 hover:text-indigo-200 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 transition-all flex items-center gap-1.5"
           >
-            {deleteMutation.isPending ? "削除中..." : "プロジェクト削除"}
-          </button>
+            <span>
+              {canEdit ? "🎨 アセット・プリセット管理" : "🎨 アセット一覧 (閲覧)"}
+            </span>
+          </Link>
+          {isOwner && (
+            <button
+              onClick={handleDelete}
+              disabled={deleteMutation.isPending}
+              className="px-4 py-2 rounded-xl text-xs font-semibold text-rose-400 hover:text-rose-300 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 transition-all"
+            >
+              {deleteMutation.isPending ? "削除中..." : "プロジェクト削除"}
+            </button>
+          )}
         </div>
       </div>
     </div>

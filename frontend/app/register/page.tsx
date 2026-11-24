@@ -24,6 +24,11 @@ export default function RegisterPage() {
       return;
     }
 
+    if (password.length < 8) {
+      setError("パスワードは8文字以上で入力してください。");
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -91,14 +96,15 @@ export default function RegisterPage() {
 
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">
-              パスワード
+              パスワード（8文字以上）
             </label>
             <input
               type="password"
               required
+              minLength={8}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
+              placeholder="8文字以上で入力"
               className="w-full px-4 py-3 rounded-xl bg-slate-950/80 border border-slate-800 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition-all text-sm"
             />
           </div>

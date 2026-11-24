@@ -12,7 +12,7 @@ import {
 
 import { ScenarioService } from './scenario.service';
 import { CreateScenarioDto } from './dto/create-scenario.dto';
-import { JwtAuthGuard } from '../auth/jwt.guard';
+import { SessionAuthGuard } from '../auth/session-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { UpdateScenarioDto } from './dto/update-scenario.dto';
 
@@ -22,7 +22,7 @@ export class ScenarioController {
     private readonly scenarioService: ScenarioService,
   ) {}
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(SessionAuthGuard)
   @Post('projects/:projectId/scenarios')
   create(
     @Param('projectId', ParseIntPipe)
@@ -41,7 +41,7 @@ export class ScenarioController {
     );
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(SessionAuthGuard)
   @Get('projects/:projectId/scenarios')
   findAll(
     @Param('projectId', ParseIntPipe)
@@ -54,7 +54,7 @@ export class ScenarioController {
     );
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(SessionAuthGuard)
   @Get('scenarios/:id')
   findOne(
     @Param('id', ParseIntPipe) id: number,
@@ -67,7 +67,7 @@ export class ScenarioController {
   } 
   
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(SessionAuthGuard)
   @Patch('scenarios/:id')
   update(
     @Param('id', ParseIntPipe) id: number,
@@ -85,7 +85,7 @@ export class ScenarioController {
     );
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(SessionAuthGuard)
   @Delete('scenarios/:id')
   remove(
     @Param('id', ParseIntPipe) id: number,

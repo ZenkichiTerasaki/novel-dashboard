@@ -1,4 +1,5 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateEventDto } from './dto/create-event.dto';
 import { ReorderEventsDto } from './dto/reorder-events.dto';
@@ -56,12 +57,7 @@ export class EventService {
         scenarioId,
         orderIndex: count,
         eventType: dto.eventType,
-        param1: dto.param1,
-        param2: dto.param2,
-        param3: dto.param3,
-        param4: dto.param4,
-        param5: dto.param5,
-        param6: dto.param6,
+        data: (dto.data ?? {}) as Prisma.InputJsonValue,
       },
     });
   }
@@ -105,7 +101,26 @@ export class EventService {
   async reorder(
     scenarioId: number,
     eventIds: number[],
+    userId: number,
   ) {
+    //親シナリオの取得
+    const scenario = await this.prisma.scenario.findUnique({
+      where: {
+        id: scenarioId,
+      },
+    });
+
+    if (!scenario) {
+      throw new NotFoundException(
+        'Scenarioが見つかりません。',
+      );
+    }
+
+    //権限の確認（EDITOR以上）
+    await this.permissionService.requireEditor(
+      userId,
+      scenario.projectId,
+    );
 
     return this.prisma.$transaction(async (tx) => {
       // Scenario内のイベントを取得
@@ -115,14 +130,14 @@ export class EventService {
 
       // 件数チェック
       if (events.length !== eventIds.length) {
-        throw new Error("eventIdsの件数が一致しません。");
+        throw new BadRequestException("eventIdsの件数が一致しません。");
       }
 
       // IDチェック
       const existingIds = new Set(events.map((e) => e.id));
       for (const id of eventIds) {
         if (!existingIds.has(id)) {
-          throw new Error(`Event ${id} はScenario ${scenarioId}に存在しません。`);
+          throw new BadRequestException(`Event ${id} はScenario ${scenarioId}に存在しません。`);
         }
       }
 
@@ -182,12 +197,9 @@ export class EventService {
       },
       data: {
         eventType: dto.eventType,
-        param1: dto.param1,
-        param2: dto.param2,
-        param3: dto.param3,
-        param4: dto.param4,
-        param5: dto.param5,
-        param6: dto.param6,
+        ...(dto.data !== undefined
+          ? { data: dto.data as Prisma.InputJsonValue }
+          : {}),
       },
     });
   }
@@ -212,7 +224,7 @@ export class EventService {
       );
     }
 
-    await this.permissionService.requireOwner(
+    await this.permissionService.requireEditor(
       userId,
       event.scenario.projectId,
     );

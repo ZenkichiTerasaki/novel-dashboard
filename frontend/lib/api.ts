@@ -1,48 +1,48 @@
-import { AuthResponse, Event, Project, Scenario, User } from "@/types";
+import {
+  AuthResponse,
+  DraftEvent,
+  Event,
+  Project,
+  ProjectAssetsResponse,
+  ProjectMember,
+  ProjectPresets,
+  ProjectRole,
+  Scenario,
+  User,
+} from "@/types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
-const TOKEN_KEY = "novel_dashboard_token";
 
-export function getToken(): string | null {
-  if (typeof window === "undefined") return null;
-  return localStorage.getItem(TOKEN_KEY);
+interface ApiFetchOptions extends RequestInit {
+  skipAuthRedirect?: boolean;
 }
 
-export function setToken(token: string): void {
-  if (typeof window !== "undefined") {
-    localStorage.setItem(TOKEN_KEY, token);
-  }
-}
-
-export function removeToken(): void {
-  if (typeof window !== "undefined") {
-    localStorage.removeItem(TOKEN_KEY);
-  }
-}
-
-// 共通リクエスト関数
-async function apiFetch<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  const token = getToken();
+// 共通リクエスト関数（HttpOnly Cookie 認証）
+async function apiFetch<T>(
+  endpoint: string,
+  options: ApiFetchOptions = {}
+): Promise<T> {
+  const { skipAuthRedirect, ...fetchOptions } = options;
 
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
-    ...(options.headers as Record<string, string>),
+    ...(fetchOptions.headers as Record<string, string>),
   };
 
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
-  }
-
   const res = await fetch(`${API_URL}${endpoint}`, {
-    ...options,
+    ...fetchOptions,
     headers,
+    credentials: "include",
     cache: "no-store",
   });
 
   if (!res.ok) {
-    if (res.status === 401) {
-      removeToken();
-      if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login")) {
+    if (res.status === 401 && !skipAuthRedirect) {
+      if (
+        typeof window !== "undefined" &&
+        !window.location.pathname.startsWith("/login") &&
+        !window.location.pathname.startsWith("/register")
+      ) {
         window.location.href = "/login";
       }
     }
@@ -53,7 +53,6 @@ async function apiFetch<T>(endpoint: string, options: RequestInit = {}): Promise
     throw new Error(message);
   }
 
-  // 204 No Content 等
   if (res.status === 204) {
     return {} as T;
   }
@@ -61,48 +60,49 @@ async function apiFetch<T>(endpoint: string, options: RequestInit = {}): Promise
   return res.json();
 }
 
-// ---------------- 認証 API ----------------
+// ---------------- 認証 API (HttpOnly Cookie + サーバー側セッション) ----------------
 
-export async function registerUser(data: { name: string; email: string; password: string }): Promise<User> {
+export async function registerUser(data: {
+  name: string;
+  email: string;
+  password: string;
+}): Promise<User> {
   return apiFetch<User>("/users", {
     method: "POST",
     body: JSON.stringify(data),
+    skipAuthRedirect: true,
   });
 }
 
-export async function loginUser(data: { email: string; password: string }): Promise<AuthResponse> {
-  const response = await apiFetch<AuthResponse>("/auth/login", {
+export async function loginUser(data: {
+  email: string;
+  password: string;
+}): Promise<AuthResponse> {
+  return apiFetch<AuthResponse>("/auth/login", {
     method: "POST",
     body: JSON.stringify(data),
+    skipAuthRedirect: true,
   });
-  if (response.access_token) {
-    setToken(response.access_token);
-  }
-  return response;
 }
 
-export function logoutUser(): void {
-  removeToken();
-  if (typeof window !== "undefined") {
-    window.location.href = "/login";
-  }
-}
-
-// JWT デコード（簡易）
-export function parseJwtPayload(token: string): { userId?: number; email?: string; exp?: number } | null {
+export async function getMe(): Promise<User | null> {
   try {
-    const base64Url = token.split(".")[1];
-    if (!base64Url) return null;
-    const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
-    const jsonPayload = decodeURIComponent(
-      atob(base64)
-        .split("")
-        .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
-        .join("")
-    );
-    return JSON.parse(jsonPayload);
+    return await apiFetch<User>("/auth/me", {
+      skipAuthRedirect: true,
+    });
   } catch {
     return null;
+  }
+}
+
+export async function logoutUser(): Promise<void> {
+  try {
+    await apiFetch<{ message: string }>("/auth/logout", {
+      method: "POST",
+      skipAuthRedirect: true,
+    });
+  } catch {
+    // すでに失効済みでもクライアント側はログイン画面へ遷移する
   }
 }
 
@@ -123,10 +123,14 @@ export async function createProject(name: string): Promise<Project> {
   });
 }
 
-export async function updateProject(id: number, name: string): Promise<Project> {
+export async function updateProject(
+  id: number,
+  name: string,
+  presets?: ProjectPresets
+): Promise<Project> {
   return apiFetch<Project>(`/projects/${id}`, {
     method: "PATCH",
-    body: JSON.stringify({ name }),
+    body: JSON.stringify({ name, ...(presets !== undefined ? { presets } : {}) }),
   });
 }
 
@@ -134,6 +138,137 @@ export async function deleteProject(id: number): Promise<{ message?: string }> {
   return apiFetch<{ message?: string }>(`/projects/${id}`, {
     method: "DELETE",
   });
+}
+
+// ---------------- プロジェクトメンバー管理 API ----------------
+
+export async function getProjectMembers(
+  projectId: number
+): Promise<ProjectMember[]> {
+  return apiFetch<ProjectMember[]>(`/projects/${projectId}/members`);
+}
+
+export async function inviteProjectMember(
+  projectId: number,
+  email: string,
+  role: "EDITOR" | "VIEWER"
+): Promise<ProjectMember> {
+  return apiFetch<ProjectMember>(`/projects/${projectId}/members`, {
+    method: "POST",
+    body: JSON.stringify({ email, role }),
+  });
+}
+
+export async function updateProjectMemberRole(
+  projectId: number,
+  memberId: number,
+  role: ProjectRole
+): Promise<ProjectMember> {
+  return apiFetch<ProjectMember>(`/projects/${projectId}/members/${memberId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ role }),
+  });
+}
+
+export async function removeProjectMember(
+  projectId: number,
+  memberId: number
+): Promise<{ message: string }> {
+  return apiFetch<{ message: string }>(
+    `/projects/${projectId}/members/${memberId}`,
+    {
+      method: "DELETE",
+    }
+  );
+}
+
+// ---------------- アセット & プリセット管理 API (Next.js Route + Backend連携) ----------------
+
+export async function getProjectAssets(
+  projectId: number
+): Promise<ProjectAssetsResponse> {
+  const res = await fetch(`/api/projects/${projectId}/assets`, {
+    credentials: "include",
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || "アセット情報の取得に失敗しました");
+  }
+  return res.json();
+}
+
+export async function saveProjectPresets(
+  projectId: number,
+  presets: ProjectPresets,
+  projectName?: string
+): Promise<ProjectAssetsResponse> {
+  // 1. ローカル presets.json に保存（認証・EDITOR以上ロール検証付き）
+  const localRes = await fetch(`/api/projects/${projectId}/assets`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ presets }),
+  });
+  if (!localRes.ok) {
+    const err = await localRes.json().catch(() => ({}));
+    throw new Error(err.message || "プリセットの保存に失敗しました");
+  }
+
+  // 2. バックエンドDB (Project.presets) にも同期
+  try {
+    await apiFetch(`/projects/${projectId}`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        ...(projectName ? { name: projectName } : {}),
+        presets,
+      }),
+    });
+  } catch {
+    // すでにローカル側保存済みのため継続
+  }
+
+  return localRes.json();
+}
+
+export async function uploadProjectAssetFile(
+  projectId: number,
+  category: "characters" | "bg" | "bgm" | "se",
+  file: File
+): Promise<ProjectAssetsResponse> {
+  const formData = new FormData();
+  formData.append("category", category);
+  formData.append("file", file);
+
+  const res = await fetch(`/api/projects/${projectId}/assets`, {
+    method: "POST",
+    credentials: "include",
+    body: formData,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || "ファイルのアップロードに失敗しました");
+  }
+  return res.json();
+}
+
+export async function deleteProjectAssetFile(
+  projectId: number,
+  category: "characters" | "bg" | "bgm" | "se",
+  filename: string
+): Promise<ProjectAssetsResponse> {
+  const res = await fetch(
+    `/api/projects/${projectId}/assets?category=${encodeURIComponent(category)}&filename=${encodeURIComponent(filename)}`,
+    {
+      method: "DELETE",
+      credentials: "include",
+    }
+  );
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || "ファイルの削除に失敗しました");
+  }
+  return res.json();
 }
 
 // ---------------- シナリオ API ----------------
@@ -146,21 +281,29 @@ export async function getScenario(id: number): Promise<Scenario> {
   return apiFetch<Scenario>(`/scenarios/${id}`);
 }
 
-export async function createScenario(projectId: number, name: string): Promise<Scenario> {
+export async function createScenario(
+  projectId: number,
+  name: string
+): Promise<Scenario> {
   return apiFetch<Scenario>(`/projects/${projectId}/scenarios`, {
     method: "POST",
     body: JSON.stringify({ name }),
   });
 }
 
-export async function updateScenario(id: number, name: string): Promise<Scenario> {
+export async function updateScenario(
+  id: number,
+  name: string
+): Promise<Scenario> {
   return apiFetch<Scenario>(`/scenarios/${id}`, {
     method: "PATCH",
     body: JSON.stringify({ name }),
   });
 }
 
-export async function deleteScenario(id: number): Promise<{ message?: string }> {
+export async function deleteScenario(
+  id: number
+): Promise<{ message?: string }> {
   return apiFetch<{ message?: string }>(`/scenarios/${id}`, {
     method: "DELETE",
   });
@@ -174,16 +317,7 @@ export async function getEvents(scenarioId: number): Promise<Event[]> {
 
 export async function createEvent(
   scenarioId: number,
-  data: {
-    eventType: string;
-    orderIndex?: number;
-    param1?: string;
-    param2?: string;
-    param3?: string;
-    param4?: string;
-    param5?: string;
-    param6?: string;
-  }
+  data: DraftEvent & { orderIndex?: number }
 ): Promise<Event> {
   return apiFetch<Event>(`/scenarios/${scenarioId}/events`, {
     method: "POST",
@@ -193,16 +327,7 @@ export async function createEvent(
 
 export async function updateEvent(
   id: number,
-  data: {
-    eventType?: string;
-    orderIndex?: number;
-    param1?: string | null;
-    param2?: string | null;
-    param3?: string | null;
-    param4?: string | null;
-    param5?: string | null;
-    param6?: string | null;
-  }
+  data: Partial<DraftEvent> & { orderIndex?: number }
 ): Promise<Event> {
   return apiFetch<Event>(`/events/${id}`, {
     method: "PATCH",
@@ -216,9 +341,15 @@ export async function deleteEvent(id: number): Promise<{ message?: string }> {
   });
 }
 
-export async function reorderEvents(scenarioId: number, eventIds: number[]): Promise<{ message: string }> {
-  return apiFetch<{ message: string }>(`/scenarios/${scenarioId}/events/order`, {
-    method: "PATCH",
-    body: JSON.stringify({ eventIds }),
-  });
+export async function reorderEvents(
+  scenarioId: number,
+  eventIds: number[]
+): Promise<{ message: string }> {
+  return apiFetch<{ message: string }>(
+    `/scenarios/${scenarioId}/events/order`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({ eventIds }),
+    }
+  );
 }

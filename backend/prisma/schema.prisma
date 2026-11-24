@@ -15,6 +15,7 @@ datasource db {
 model Project {
   id        Int      @id @default(autoincrement())
   name      String
+  presets   Json     @default("{}")
 
   scenarios Scenario[]
   members ProjectMember[]
@@ -46,13 +47,7 @@ model Event {
   orderIndex Int @default(0)
 
   eventType  String
-
-  param1 String?
-  param2 String?
-  param3 String?
-  param4 String?
-  param5 String?
-  param6 String?
+  data       Json      @default("{}")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -65,10 +60,23 @@ model User {
   name      String
   email     String   @unique
   password  String
-  members ProjectMember[]
+  members   ProjectMember[]
+  sessions  Session[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 enum ProjectRole {

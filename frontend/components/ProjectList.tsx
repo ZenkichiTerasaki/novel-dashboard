@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getProjects, deleteProject } from "@/lib/api";
 import { Project } from "@/types";
+import RoleBadge, { isProjectOwner } from "./RoleBadge";
 
 export default function ProjectList() {
   const queryClient = useQueryClient();
@@ -19,6 +20,10 @@ export default function ProjectList() {
     mutationFn: (id: number) => deleteProject(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["projects"] });
+      setDeletingId(null);
+    },
+    onError: (err: Error) => {
+      alert(err.message || "プロジェクトの削除に失敗しました");
       setDeletingId(null);
     },
   });
@@ -64,38 +69,55 @@ export default function ProjectList() {
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-      {projects.map((project) => (
-        <Link
-          key={project.id}
-          href={`/projects/${project.id}`}
-          className="group relative block bg-slate-900/60 hover:bg-slate-900 border border-slate-800/80 hover:border-indigo-500/50 rounded-2xl p-6 backdrop-blur-md transition-all duration-200 shadow-sm hover:shadow-indigo-500/5"
-        >
-          <div className="flex items-start justify-between mb-4">
-            <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold text-lg group-hover:scale-105 transition-transform">
-              📖
+      {projects.map((project) => {
+        const owner = isProjectOwner(project.myRole);
+        return (
+          <Link
+            key={project.id}
+            href={`/projects/${project.id}`}
+            className="group relative block bg-slate-900/60 hover:bg-slate-900 border border-slate-800/80 hover:border-indigo-500/50 rounded-2xl p-6 backdrop-blur-md transition-all duration-200 shadow-sm hover:shadow-indigo-500/5"
+          >
+            <div className="flex items-start justify-between gap-2 mb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold text-lg group-hover:scale-105 transition-transform">
+                  📖
+                </div>
+                <RoleBadge role={project.myRole} compact />
+              </div>
+
+              {owner && (
+                <button
+                  onClick={(e) => handleDelete(e, project.id, project.name)}
+                  disabled={deletingId === project.id}
+                  className="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+                  title="プロジェクト削除 (OWNER)"
+                >
+                  {deletingId === project.id ? "..." : "🗑️"}
+                </button>
+              )}
             </div>
-            <button
-              onClick={(e) => handleDelete(e, project.id, project.name)}
-              disabled={deletingId === project.id}
-              className="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
-              title="削除"
-            >
-              {deletingId === project.id ? "..." : "🗑️"}
-            </button>
-          </div>
 
-          <h3 className="text-lg font-bold text-slate-100 group-hover:text-indigo-400 transition-colors line-clamp-1">
-            {project.name}
-          </h3>
+            <h3 className="text-lg font-bold text-slate-100 group-hover:text-indigo-400 transition-colors line-clamp-1">
+              {project.name}
+            </h3>
 
-          <div className="mt-4 pt-3 border-t border-slate-800/60 flex items-center justify-between text-xs text-slate-400">
-            <span>ID: #{project.id}</span>
-            <span className="text-indigo-400 group-hover:translate-x-0.5 transition-transform font-medium">
-              開く &rarr;
-            </span>
-          </div>
-        </Link>
-      ))}
+            <div className="mt-4 pt-3 border-t border-slate-800/60 flex items-center justify-between text-xs text-slate-400">
+              <div className="flex items-center gap-3">
+                <span>ID: #{project.id}</span>
+                {project._count && (
+                  <>
+                    <span>📜 {project._count.scenarios ?? 0}</span>
+                    <span>👥 {project._count.members ?? 1}</span>
+                  </>
+                )}
+              </div>
+              <span className="text-indigo-400 group-hover:translate-x-0.5 transition-transform font-medium">
+                開く &rarr;
+              </span>
+            </div>
+          </Link>
+        );
+      })}
     </div>
   );
 }

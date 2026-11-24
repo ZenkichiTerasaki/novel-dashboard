@@ -1,6 +1,6 @@
 "use client";
 
-import React, { use, useEffect } from "react";
+import React, { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/providers/AuthProvider";
@@ -9,8 +9,12 @@ import { Project } from "@/types";
 
 import Navbar from "@/components/Navbar";
 import ProjectHeader from "@/components/ProjectHeader";
+import ProjectMembersPanel from "@/components/ProjectMembersPanel";
 import ScenarioForm from "@/components/ScenarioForm";
 import ScenarioList from "@/components/ScenarioList";
+import { canEditProject } from "@/components/RoleBadge";
+
+type ProjectTab = "scenarios" | "members";
 
 export default function ProjectDetailPage({
   params,
@@ -22,6 +26,7 @@ export default function ProjectDetailPage({
 
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const router = useRouter();
+  const [activeTab, setActiveTab] = useState<ProjectTab>("scenarios");
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -71,6 +76,8 @@ export default function ProjectDetailPage({
     );
   }
 
+  const canEdit = canEditProject(project.myRole);
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
       <Navbar />
@@ -78,14 +85,61 @@ export default function ProjectDetailPage({
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <ProjectHeader project={project} />
 
-        <div className="mb-6 flex items-center justify-between">
-          <h2 className="text-xl font-bold tracking-tight text-slate-100">
-            シナリオ一覧
-          </h2>
+        {/* ロール別ダッシュボード案内 */}
+        {project.myRole === "VIEWER" && (
+          <div className="mb-6 p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-200 text-xs flex items-center gap-2">
+            <span>👁️</span>
+            <span>
+              現在 <strong>VIEWER（閲覧者）</strong> として表示しています。シナリオ閲覧・ゲームプレビュー再生・CSV書き出しが利用可能です（編集・削除操作は非表示になっています）。
+            </span>
+          </div>
+        )}
+
+        {/* タブ切替（シナリオ一覧 / メンバー・共有管理） */}
+        <div className="mb-6 flex items-center gap-2 border-b border-slate-800/80 pb-3">
+          <button
+            type="button"
+            onClick={() => setActiveTab("scenarios")}
+            className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 ${
+              activeTab === "scenarios"
+                ? "bg-indigo-600/20 text-indigo-200 border border-indigo-500/40"
+                : "text-slate-400 hover:text-slate-200 hover:bg-slate-900 border border-transparent"
+            }`}
+          >
+            <span>📜 シナリオ一覧</span>
+            {project._count?.scenarios !== undefined && (
+              <span className="px-1.5 py-0.5 rounded-full bg-slate-800 text-[10px] font-mono text-slate-300">
+                {project._count.scenarios}
+              </span>
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab("members")}
+            className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 ${
+              activeTab === "members"
+                ? "bg-indigo-600/20 text-indigo-200 border border-indigo-500/40"
+                : "text-slate-400 hover:text-slate-200 hover:bg-slate-900 border border-transparent"
+            }`}
+          >
+            <span>👥 メンバー・共有管理</span>
+            {project._count?.members !== undefined && (
+              <span className="px-1.5 py-0.5 rounded-full bg-slate-800 text-[10px] font-mono text-slate-300">
+                {project._count.members}
+              </span>
+            )}
+          </button>
         </div>
 
-        <ScenarioForm projectId={projectId} />
-        <ScenarioList projectId={projectId} />
+        {activeTab === "scenarios" ? (
+          <>
+            {canEdit && <ScenarioForm projectId={projectId} />}
+            <ScenarioList projectId={projectId} myRole={project.myRole} />
+          </>
+        ) : (
+          <ProjectMembersPanel projectId={projectId} myRole={project.myRole} />
+        )}
       </main>
     </div>
   );
